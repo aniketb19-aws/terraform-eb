@@ -1,6 +1,6 @@
 variable "buses" {
   type        = list(string)
-  default     = ["arn:aws:events:us-east-1:768827764971:event-bus/eb1", "arn:aws:events:us-east-1:768827764971:event-bus/eb2"]
+  default     = ["eb1", "eb2"]
   description = "Name of the first EventBus"
 }
 
