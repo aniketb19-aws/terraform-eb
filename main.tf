@@ -60,14 +60,23 @@ output "ebRole" {
   value = aws_iam_role.event_bus_invoke_central_event_bus.arn
 }
 
-resource "aws_cloudwatch_event_bus" "centralBus" {
-  name = "central-event-bus"
+module "central_eventbridge" {
+  providers = {
+    aws = aws.central
+  }
+  source = "terraform-aws-modules/eventbridge/aws"
 
+  bus_name = "central-event-bus"
+
+  tags = {
+    Name = "my-bus"
+  }
 }
+
 resource "aws_cloudwatch_event_target" "EBtargets" {
   for_each       = tomap(aws_cloudwatch_event_rule.ebrule)
   event_bus_name = each.key
   rule           = each.value.name
-  arn            = aws_cloudwatch_event_bus.centralBus.arn
+  arn            = module.central_eventbridge.eventbridge_bus_arn
   role_arn       = aws_iam_role.event_bus_invoke_central_event_bus.arn
 }
