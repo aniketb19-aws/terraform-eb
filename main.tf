@@ -1,5 +1,3 @@
-data "aws_caller_identity" "current" {}
-
 locals {
   account_id = data.aws_caller_identity.current.account_id
 }
@@ -16,30 +14,9 @@ resource "aws_cloudwatch_event_rule" "ebrule" {
   is_enabled = true
 }
 
-data "aws_iam_policy_document" "assume_role" {
-  statement {
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["events.amazonaws.com"]
-    }
-
-    actions = ["sts:AssumeRole"]
-  }
-}
-
 resource "aws_iam_role" "event_bus_invoke_central_event_bus" {
   name               = "event-bus-invoke-central-event-bus"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
-}
-
-data "aws_iam_policy_document" "event_bus_invoke_central_event_bus_policy" {
-  statement {
-    effect    = "Allow"
-    actions   = ["events:PutEvents"]
-    resources = ["*"]
-  }
 }
 
 resource "aws_iam_policy" "event_bus_invoke_central_event_bus" {
@@ -50,14 +27,6 @@ resource "aws_iam_policy" "event_bus_invoke_central_event_bus" {
 resource "aws_iam_role_policy_attachment" "event_bus_invoke_central_event_bus" {
   role       = aws_iam_role.event_bus_invoke_central_event_bus.name
   policy_arn = aws_iam_policy.event_bus_invoke_central_event_bus.arn
-}
-
-output "all_rules" {
-  value = aws_cloudwatch_event_rule.ebrule
-}
-
-output "ebRole" {
-  value = aws_iam_role.event_bus_invoke_central_event_bus.arn
 }
 
 module "central_eventbridge" {
