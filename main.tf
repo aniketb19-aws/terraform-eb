@@ -2,8 +2,9 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
 }
 
+// Loop over all Eventbus and create rule for each
 resource "aws_cloudwatch_event_rule" "ebrule" {
-  for_each = toset(var.buses)
+  for_each = nonsensitive(toset(var.buses))
   #name=each.key
   event_bus_name = each.value
   event_pattern = jsonencode({
@@ -14,6 +15,7 @@ resource "aws_cloudwatch_event_rule" "ebrule" {
   is_enabled = true
 }
 
+//IAM role and policy for Event rule
 resource "aws_iam_role" "event_bus_invoke_central_event_bus" {
   name               = "event-bus-invoke-central-event-bus"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
@@ -29,6 +31,76 @@ resource "aws_iam_role_policy_attachment" "event_bus_invoke_central_event_bus" {
   policy_arn = aws_iam_policy.event_bus_invoke_central_event_bus.arn
 }
 
+resource "aws_cloudwatch_log_group" "log-group" {
+  name  = "/aws/events/central-bus-logs/logs"
+  retention_in_days =  7  
+}
+
+resource "aws_cloudwatch_event_rule" "centralEBrule"{
+  name          = "central-bus-event-rule"
+  description   = "Send all events from Central Eventbus to Cloudwatch logs"
+  event_bus_name = "central-event-bus"
+  event_pattern = jsonencode({
+    account = [
+      local.account_id
+    ]
+  })
+  is_enabled = true
+
+}
+
+data "aws_iam_policy_document" "log_policy" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogStream"
+    ]
+
+    resources = [
+      "${aws_cloudwatch_log_group.log-group.arn}:*"
+    ]
+
+    principals {
+      type = "Service"
+      identifiers = [
+        "events.amazonaws.com",
+        "delivery.logs.amazonaws.com"
+      ]
+    }
+ }
+  statement {
+    effect = "Allow"
+    actions = [
+      "logs:PutLogEvents"
+    ]
+
+    resources = [
+      "${aws_cloudwatch_log_group.log-group.arn}:*:*"
+    ]
+
+    principals {
+      type = "Service"
+      identifiers = [
+        "events.amazonaws.com",
+        "delivery.logs.amazonaws.com"
+      ]
+    }
+    condition {
+      test     = "ArnEquals"
+      values   = [aws_cloudwatch_event_rule.centralEBrule.arn]
+      variable = "aws:SourceArn"
+    }
+  }
+}
+
+
+resource "aws_cloudwatch_log_resource_policy" "log-resource-policy" {
+  policy_document = data.aws_iam_policy_document.log_policy.json
+  policy_name     = "eventbridge-log-publishing-policy"
+}
+
+
+//Use Eventbridge module to create Central Eventbus
 module "central_eventbridge" {
   providers = {
     aws = aws.central
@@ -37,11 +109,19 @@ module "central_eventbridge" {
 
   bus_name = "central-event-bus"
 
+  targets = {
+    logs = [
+      {
+        name = "send-logs-to-cloudwatch"
+        arn  = aws_cloudwatch_log_group.log-group.arn
+      }
+    ]
+  }
   tags = {
     Name = "my-bus"
   }
 }
-
+//Create targets on each rule to send events to Central Eventbus
 resource "aws_cloudwatch_event_target" "EBtargets" {
   for_each       = tomap(aws_cloudwatch_event_rule.ebrule)
   event_bus_name = each.key

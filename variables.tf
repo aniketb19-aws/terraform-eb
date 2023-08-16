@@ -1,7 +1,7 @@
 variable "buses" {
   type        = list(string)
-  default     = ["*", "*"]
   description = "Name of the first EventBus"
+  sensitive = true
 }
 
 variable "centralEB" {
@@ -9,10 +9,3 @@ variable "centralEB" {
   default     = "centralEB"
   description = "Name of central EventBus"
 }
-
-variable "names" {
-  type    = set(string)
-  default = ["eb1", "eb2"]
-
-}
-
