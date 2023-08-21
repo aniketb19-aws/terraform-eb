@@ -36,18 +36,23 @@ resource "aws_cloudwatch_log_group" "log-group" {
   retention_in_days =  7  
 }
 
-resource "aws_cloudwatch_event_rule" "centralEBrule"{
-  name          = "central-bus-event-rule"
-  description   = "Send all events from Central Eventbus to Cloudwatch logs"
-  event_bus_name = "central-event-bus"
-  event_pattern = jsonencode({
-    account = [
-      local.account_id
-    ]
-  })
-  is_enabled = true
-
+locals {
+  centralRule= module.central_eventbridge.ruleArn
 }
+output "createdRuleArn" {
+  value = module.central_eventbridge.eventbridge_rule_arns
+}
+//resource "aws_cloudwatch_event_rule" "centralEBrule"{
+//  name          = "central-bus-event-rule"
+//  description   = "Send all events from Central Eventbus to Cloudwatch logs"
+//  event_bus_name = "central-event-bus"
+//  event_pattern = jsonencode({
+//    account = [
+//      local.account_id
+//    ]
+//  })
+//  is_enabled = true
+//}
 
 data "aws_iam_policy_document" "log_policy" {
   statement {
@@ -87,7 +92,7 @@ data "aws_iam_policy_document" "log_policy" {
     }
     condition {
       test     = "ArnEquals"
-      values   = [aws_cloudwatch_event_rule.centralEBrule.arn]
+      values   = [local.centralRule]
       variable = "aws:SourceArn"
     }
   }
@@ -109,6 +114,20 @@ module "central_eventbridge" {
 
   bus_name = "central-event-bus"
 
+  rules = {
+    logs={
+        name          = "central-bus-event-rule"
+        description   = "Send all events from Central Eventbus to Cloudwatch logs"
+        event_bus_name = "central-event-bus"
+        event_pattern = jsonencode({
+          account = [
+          local.account_id
+          ]
+          })
+        is_enabled = true
+     }
+  }
+
   targets = {
     logs = [
       {
@@ -120,6 +139,11 @@ module "central_eventbridge" {
   tags = {
     Name = "my-bus"
   }
+
+  output "ruleArn" {
+    value = eventbridge_rule_arns
+  }
+
 }
 //Create targets on each rule to send events to Central Eventbus
 resource "aws_cloudwatch_event_target" "EBtargets" {
