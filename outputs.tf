@@ -9,3 +9,7 @@ output "ebRole" {
 output "central_bus_arn" {
   value = module.central_eventbridge.eventbridge_bus_arn
 }
+
+output "central_bus_rule_arn" {
+  value = module.central_eventbridge.eventbridge_rule_arns
+}

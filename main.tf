@@ -36,12 +36,12 @@ resource "aws_cloudwatch_log_group" "log-group" {
   retention_in_days =  7  
 }
 
-locals {
-  centralRule= module.central_eventbridge.ruleArn
-}
-output "createdRuleArn" {
-  value = module.central_eventbridge.eventbridge_rule_arns
-}
+# locals {
+#    centralRule= module.central_eventbridge.eventbridge_rule_arns
+#  }
+ output "createdRuleArn" {
+   value = module.central_eventbridge.eventbridge_rule_arns
+ }
 //resource "aws_cloudwatch_event_rule" "centralEBrule"{
 //  name          = "central-bus-event-rule"
 //  description   = "Send all events from Central Eventbus to Cloudwatch logs"
@@ -55,6 +55,7 @@ output "createdRuleArn" {
 //}
 
 data "aws_iam_policy_document" "log_policy" {
+  depends_on = [ module.central_eventbridge ]
   statement {
     effect = "Allow"
     actions = [
@@ -92,17 +93,17 @@ data "aws_iam_policy_document" "log_policy" {
     }
     condition {
       test     = "ArnEquals"
-      values   = [local.centralRule]
+      values   = [module.central_eventbridge.eventbridge_rule_arns]
       variable = "aws:SourceArn"
     }
   }
 }
 
 
-resource "aws_cloudwatch_log_resource_policy" "log-resource-policy" {
-  policy_document = data.aws_iam_policy_document.log_policy.json
-  policy_name     = "eventbridge-log-publishing-policy"
-}
+# resource "aws_cloudwatch_log_resource_policy" "log-resource-policy" {
+#   policy_document = data.aws_iam_policy_document.log_policy.json
+#   policy_name     = "eventbridge-log-publishing-policy"
+# }
 
 
 //Use Eventbridge module to create Central Eventbus
@@ -114,8 +115,10 @@ module "central_eventbridge" {
 
   bus_name = "central-event-bus"
 
+  //attach_cloudwatch_policy = true
+
   rules = {
-    logs={
+    log-rule={
         name          = "central-bus-event-rule"
         description   = "Send all events from Central Eventbus to Cloudwatch logs"
         event_bus_name = "central-event-bus"
@@ -129,7 +132,7 @@ module "central_eventbridge" {
   }
 
   targets = {
-    logs = [
+    log-rule = [
       {
         name = "send-logs-to-cloudwatch"
         arn  = aws_cloudwatch_log_group.log-group.arn
@@ -139,11 +142,6 @@ module "central_eventbridge" {
   tags = {
     Name = "my-bus"
   }
-
-  output "ruleArn" {
-    value = eventbridge_rule_arns
-  }
-
 }
 //Create targets on each rule to send events to Central Eventbus
 resource "aws_cloudwatch_event_target" "EBtargets" {
